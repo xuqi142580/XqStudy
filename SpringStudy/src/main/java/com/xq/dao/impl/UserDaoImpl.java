@@ -4,7 +4,7 @@ import com.xq.annotion.Component;
 import com.xq.annotion.Scope;
 import com.xq.dao.UserDaoRepository;
 
-@Scope("prope")
+@Scope
 @Component("userDao")
 public class UserDaoImpl implements UserDaoRepository {
     @Override

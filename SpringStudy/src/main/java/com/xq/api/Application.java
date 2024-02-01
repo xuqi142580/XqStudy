@@ -10,9 +10,10 @@ public class Application {
     public static void main(String[] args) throws Exception {
         AnnotionContextApplication annotionContextApplication = new AnnotionContextApplication(AppConfig.class);
 
-        UserDaoImpl userDao = (UserDaoImpl) annotionContextApplication.getBean("userDao");
-        userDao.test();
-        UserServiceImpl userService = (UserServiceImpl)annotionContextApplication.getBean("userService");
+//        UserDaoImpl userDao = (UserDaoImpl) annotionContextApplication.getBean("userDao");
+//        userDao.test();
+        UserServiceImpl userService = (UserServiceImpl) annotionContextApplication.getBean("userService");
         userService.test();
+
     }
 }

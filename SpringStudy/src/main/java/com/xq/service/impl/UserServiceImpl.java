@@ -20,7 +20,7 @@ public class UserServiceImpl implements UserServiceRepository {
     }
 
     @Resource
-    public UserDaoImpl userDao;
+    private UserDaoImpl userDao;
 
 
     @Override

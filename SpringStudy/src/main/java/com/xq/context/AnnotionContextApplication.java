@@ -19,8 +19,8 @@ public class AnnotionContextApplication {
 
     private final String SUFFIX = ".class";
     private String DEFAULT_BEAN_TYPE = "singleton";
-    private HashMap<String, BeanDefintion> BeanDefintionHashMap = new HashMap<String, BeanDefintion>();
-    private ConcurrentHashMap<String, Object> singletonHashMap = new ConcurrentHashMap<String, Object>();
+    HashMap<String, BeanDefintion> BeanDefintionHashMap = new HashMap<String, BeanDefintion>();
+    ConcurrentHashMap<String, Object> singletonHashMap = new ConcurrentHashMap<String, Object>();
 
     public AnnotionContextApplication(Class<AppConfig> appConfigClass) {
 
@@ -86,34 +86,6 @@ public class AnnotionContextApplication {
                         //是否含有scope注解 标识为单例 原型等
                         if (className.isAnnotationPresent(Scope.class)) {
                             DEFAULT_BEAN_TYPE = className.getDeclaredAnnotation(Scope.class).value();
-                        }
-                        //解析是否含有依赖注入
-                        Field[] resourceFieldList = className.getDeclaredFields();
-                        for (Field resourceField : resourceFieldList) {
-                            if (resourceField.isAnnotationPresent(Autowired.class) || resourceField.isAnnotationPresent(Resource.class)) {
-                                //如果含有Autowired、Resource注解说明是依赖
-                                //首先按类型注入
-                                String beanType = resourceField.getType().toString();
-                                beanType = String.valueOf(beanType.charAt(0)).toLowerCase() + beanType.substring(1);
-                                //
-                                BeanDefintion beanDefintion = BeanDefintionHashMap.get(beanType);
-                                Object bean = null;
-                                if (ObjectUtils.isEmpty(beanDefintion) && resourceField.isAnnotationPresent(Resource.class)) {
-                                    //其次按名称注入
-                                    String name = resourceField.getName();
-                                    bean = getBean(name);
-                                }
-                                String scope = beanDefintion.getScope();
-                                if (scope.equals("singleton")) {
-                                    //如果是单例
-                                    bean = singletonHashMap.get(beanType);
-                                } else {
-                                    bean = createBeanByBeanDefintion(beanDefintion.getClassName());
-                                }
-                                System.out.println(bean);
-                                resourceField.setAccessible(true);
-                                className.getConstructor(Object.class).newInstance(bean);
-                            }
                         }
                         //注册bean 的元配置信息
                         BeanDefintion beanDefintion = new BeanDefintion(className, DEFAULT_BEAN_TYPE);
@@ -186,44 +158,47 @@ public class AnnotionContextApplication {
                         if (className.isAnnotationPresent(Component.class)) {
                             DEFAULT_BEAN_TYPE = className.getDeclaredAnnotation(Scope.class).value();
                         }
-                        //解析是否含有依赖注入
-                        Field[] resourceFieldList = className.getDeclaredFields();
-                        for (Field resourceField : resourceFieldList) {
-                            if (resourceField.isAnnotationPresent(Autowired.class) || resourceField.isAnnotationPresent(Resource.class)) {
-                                //如果含有Autowired、Resource注解说明是依赖
-                                //首先按类型注入
-                                String beanType = resourceField.getType().toString();
-                                beanType = String.valueOf(beanType.charAt(0)).toLowerCase() + beanType.substring(1);
-                                //
-                                BeanDefintion beanDefintion = BeanDefintionHashMap.get(beanType);
-                                Object bean = null;
-                                if (ObjectUtils.isEmpty(beanDefintion) && resourceField.isAnnotationPresent(Resource.class)) {
-                                    //其次按名称注入
-                                    String name = resourceField.getName();
-                                    bean = getBean(name);
-                                } else {
-                                    String scope = beanDefintion.getScope();
-                                    if (scope.equals("singleton")) {
-                                        //如果是单例
-                                        bean = singletonHashMap.get(beanType);
-                                    } else {
-                                        bean = createBeanByBeanDefintion(beanDefintion.getClassName());
-                                    }
-                                }
-                                Class<?> aClass = bean.getClass();
-                                resourceField.setAccessible(true);
-                                System.out.println(bean);
-                                className.getConstructor(aClass).newInstance(bean);
-                            }
-                        }
                         //注册bean 的元配置信息
                         BeanDefintion beanDefintion = new BeanDefintion(className, DEFAULT_BEAN_TYPE);
                         BeanDefintionHashMap.put(beanName, beanDefintion);
-
                     }
                 } else {
                     recursionAnaFile(resultFile, outPutPath);
                 }
+            }
+        }
+    }
+
+
+    public void di(Class<?> className) throws Exception {
+        //解析是否含有依赖注入
+        Field[] resourceFieldList = className.getDeclaredFields();
+        for (Field resourceField : resourceFieldList) {
+            if (resourceField.isAnnotationPresent(Autowired.class) || resourceField.isAnnotationPresent(Resource.class)) {
+                //如果含有Autowired、Resource注解说明是依赖
+                //首先按类型注入
+                String beanType = resourceField.getType().toString();
+                beanType = String.valueOf(beanType.charAt(0)).toLowerCase() + beanType.substring(1);
+                //
+                BeanDefintion dIbeanDefintion = BeanDefintionHashMap.get(beanType);
+                Object bean = null;
+                if (ObjectUtils.isEmpty(dIbeanDefintion) && resourceField.isAnnotationPresent(Resource.class)) {
+                    //其次按名称注入
+                    String name = resourceField.getName();
+                    bean = getBean(name);
+                }
+                if (ObjectUtils.isEmpty(bean)) {
+                    String dIScope = dIbeanDefintion.getScope();
+                    if (dIScope.equals("singleton")) {
+                        //如果是单例
+                        bean = singletonHashMap.get(beanType);
+                    } else {
+                        bean = createBeanByBeanDefintion(dIbeanDefintion.getClassName());
+                    }
+                }
+                resourceField.setAccessible(true);
+                className.getDeclaredConstructor(bean.getClass()).newInstance(bean);
+//                    resourceField.set(className.newInstance(), bean);
             }
         }
     }
@@ -235,17 +210,18 @@ public class AnnotionContextApplication {
      * @return
      */
     public Object getBean(String beanName) throws Exception {
+        Object object = null;
         if (BeanDefintionHashMap.containsKey(beanName)) {
             BeanDefintion beanDefintion = BeanDefintionHashMap.get(beanName);
             String scope = beanDefintion.getScope();
             Class<?> className = beanDefintion.getClassName();
             if (scope.equals("singleton")) {
                 //说明是单例
-                return singletonHashMap.get(beanName);
+                object = singletonHashMap.get(beanName);
             } else {
-                return createBeanByBeanDefintion(className);
+                object = createBeanByBeanDefintion(className);
             }
         }
-        return null;
+        return object;
     }
 }
