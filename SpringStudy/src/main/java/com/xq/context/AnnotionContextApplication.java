@@ -12,7 +12,6 @@ import java.lang.reflect.Field;
 import java.net.URL;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
 
 
 public class AnnotionContextApplication {
@@ -21,6 +20,7 @@ public class AnnotionContextApplication {
     private String DEFAULT_BEAN_TYPE = "singleton";
     HashMap<String, BeanDefintion> BeanDefintionHashMap = new HashMap<String, BeanDefintion>();
     ConcurrentHashMap<String, Object> singletonHashMap = new ConcurrentHashMap<String, Object>();
+    HashSet<String> beanFactoryList = new HashSet<>();
 
     public AnnotionContextApplication(Class<AppConfig> appConfigClass) {
 
@@ -40,8 +40,10 @@ public class AnnotionContextApplication {
                 //单个扫描包
                 scanByPackageUrl(packageUrl, classLoader, outPutPath);
             }
+            //初始化bean的元配置信息
+            registerBeanDifinion();
             //通过元信息注册bean
-            registerBean();
+            createBean();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -75,22 +77,7 @@ public class AnnotionContextApplication {
                     //解析文件路径
                     resultFilePath = resultFilePath.substring(outPutPath.length(), resultFilePath.length() - SUFFIX.length());
                     resultFilePath = resultFilePath.replaceAll("\\\\", ".");
-                    //获取bean对象
-                    Class<?> className = Class.forName(resultFilePath);
-                    //是否含有Compoent的注解
-                    if (className.isAnnotationPresent(Component.class)) {
-                        String beanName = className.getDeclaredAnnotation(Component.class).value();
-                        if (!StringUtils.isEmpty(beanName)) {
-                            beanName = resultFileName;
-                        }
-                        //是否含有scope注解 标识为单例 原型等
-                        if (className.isAnnotationPresent(Scope.class)) {
-                            DEFAULT_BEAN_TYPE = className.getDeclaredAnnotation(Scope.class).value();
-                        }
-                        //注册bean 的元配置信息
-                        BeanDefintion beanDefintion = new BeanDefintion(className, DEFAULT_BEAN_TYPE);
-                        BeanDefintionHashMap.put(beanName, beanDefintion);
-                    }
+                    beanFactoryList.add(resultFilePath);
                 } else {
                     //如果是文件夹 递归解析文件夹
                     recursionAnaFile(resultFile, outPutPath);
@@ -100,11 +87,33 @@ public class AnnotionContextApplication {
 
     }
 
+
+    public void registerBeanDifinion() throws ClassNotFoundException {
+        for (String beanFactory : beanFactoryList) {
+            //获取bean对象
+            Class<?> className = Class.forName(beanFactory);
+            //是否含有Compoent的注解
+            if (className.isAnnotationPresent(Component.class)) {
+                String beanName = className.getDeclaredAnnotation(Component.class).value();
+                if (!StringUtils.isEmpty(beanName)) {
+                    beanName = beanFactory;
+                }
+                //是否含有scope注解 标识为单例 原型等
+                if (className.isAnnotationPresent(Scope.class)) {
+                    DEFAULT_BEAN_TYPE = className.getDeclaredAnnotation(Scope.class).value();
+                }
+                //注册bean 的元配置信息
+                BeanDefintion beanDefintion = new BeanDefintion(className, DEFAULT_BEAN_TYPE);
+                BeanDefintionHashMap.put(beanName, beanDefintion);
+            }
+        }
+    }
+
     /*****
      * 注册bean对象
      * @throws Exception
      */
-    public void registerBean() throws Exception {
+    public void createBean() throws Exception {
         Set<String> beanNameList = BeanDefintionHashMap.keySet();
         for (String beanName : beanNameList) {
             BeanDefintion beanDefintion = BeanDefintionHashMap.get(beanName);

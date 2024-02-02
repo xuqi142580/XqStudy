@@ -12,8 +12,9 @@ public class Application {
 
 //        UserDaoImpl userDao = (UserDaoImpl) annotionContextApplication.getBean("userDao");
 //        userDao.test();
-        UserServiceImpl userService = (UserServiceImpl) annotionContextApplication.getBean("userService");
-        userService.test();
+//        UserServiceImpl userService = (UserServiceImpl) annotionContextApplication.getBean("userService");
+//        userService.test();
+
 
     }
 }

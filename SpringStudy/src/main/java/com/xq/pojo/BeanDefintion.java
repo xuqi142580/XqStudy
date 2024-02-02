@@ -2,7 +2,6 @@ package com.xq.pojo;
 
 public class BeanDefintion {
 
-
     public BeanDefintion(Class className, String scope) {
         this.className = className;
         this.scope = scope;
