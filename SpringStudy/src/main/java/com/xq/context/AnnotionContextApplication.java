@@ -1,12 +1,11 @@
 package com.xq.context;
 
-import com.xq.annotion.Component;
-import com.xq.annotion.Lazy;
-import com.xq.annotion.Scope;
+import com.xq.annotion.*;
 import com.xq.config.AppConfig;
 import com.xq.pojo.BeanDefintion;
 import com.xq.support.BeanDefintionReader;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -54,7 +53,6 @@ public class AnnotionContextApplication {
      * @throws Exception
      */
     public void dependencyInjection() throws Exception {
-
         //给单例池容器中的对象注入依赖
         doDependencyInjection(singletonBeanHashMap);
         //给非单例池容器中的对象注入依赖
@@ -68,7 +66,22 @@ public class AnnotionContextApplication {
      * @throws Exception
      */
     public void doDependencyInjection(ConcurrentHashMap<String, Object> resourceBeanHashMap) throws Exception {
+        Set<String> beanNameSet = resourceBeanHashMap.keySet();
+        for (String beanName : beanNameSet) {
+            //获取到实例对象
+            Class<?> classNameByBeanName = (Class<?>) resourceBeanHashMap.get(beanName);
+            //获取实例对象的所有属性
+            Field[] fieldList = classNameByBeanName.getDeclaredFields();
+            //遍历属性
+            for (Field field : fieldList) {
+                if (field.isAnnotationPresent(Autowired.class)
+                        || field.isAnnotationPresent(Resource.class)) {
+                    //如果含有Autowired和Resource注解 则说明为依赖
+                    //默认按类型装配
 
+                }
+            }
+        }
     }
 
 
