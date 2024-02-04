@@ -74,10 +74,15 @@ public class AnnotionContextApplication {
             Field[] fieldList = classNameByBeanName.getDeclaredFields();
             //遍历属性
             for (Field field : fieldList) {
-                if (field.isAnnotationPresent(Autowired.class)
-                        || field.isAnnotationPresent(Resource.class)) {
-                    //如果含有Autowired和Resource注解 则说明为依赖
+                String fieldName = field.getName();
+                Class<?> fieldType = field.getType().getComponentType();
+                if (field.isAnnotationPresent(Autowired.class)) {
+                    //如果含有Autowired注解 则说明为依赖
                     //默认按类型装配
+                    if (singletonBeanHashMap.containsKey(fieldType)) {
+
+                    }
+                } else if (field.isAnnotationPresent(Resource.class)) {
 
                 }
             }
