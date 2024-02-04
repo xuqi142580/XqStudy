@@ -5,7 +5,10 @@ import com.xq.annotion.ComponentScan;
 import com.xq.config.AppConfig;
 
 import java.io.File;
+import java.io.UnsupportedEncodingException;
+import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.URLDecoder;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -20,7 +23,8 @@ public class BeanDefintionReader {
     //获取当前类加载器
     private final ClassLoader classLoader = this.getClass().getClassLoader();
     //获取当前输出路径
-    private final String outPutPath = classLoader.getResource("").getPath().substring(1);
+    private final String outPutPath = URLDecoder.decode(classLoader.getResource("").getPath().substring(1), "UTF-8");
+
     //bean的名称
     public Set<String> DEFAULT_BEANCLASSNAME = new HashSet<>();
 
@@ -29,7 +33,7 @@ public class BeanDefintionReader {
      * @param appConfigClassList
      * @return
      */
-    public BeanDefintionReader(Class<AppConfig> appConfigClassList) throws ClassNotFoundException {
+    public BeanDefintionReader(Class<AppConfig> appConfigClassList) throws Exception {
         //解析配置文件获取包名
         setAppConfigPackage(appConfigClassList);
         //解析配置文件中的包名
@@ -49,15 +53,16 @@ public class BeanDefintionReader {
     }
 
 
-    public void scanPackageList() throws ClassNotFoundException {
+    public void scanPackageList() throws Exception {
         //遍历配置包
         for (String appConfigPackage : appConfigPackageList) {
             //将配置包转为文件格式
             appConfigPackage = appConfigPackage.replaceAll("\\.", "/");
             //利用类加载器获取资源
             URL resource = classLoader.getResource(appConfigPackage);
+            String decode = URLDecoder.decode(resource.toString(), "UTF-8");
             //资源文件
-            File resourceFile = new File(resource.getFile());
+            File resourceFile = new File(new URL(decode).getFile());
             doScanPackage(resourceFile);
         }
     }
@@ -90,8 +95,6 @@ public class BeanDefintionReader {
             }
         }
     }
-
-
 
 
     /****

@@ -23,6 +23,10 @@ public class AnnotionContextApplication {
     ConcurrentHashMap<String, Object> singletonBeanHashMap = new ConcurrentHashMap<>();
     //已经加载完成的原型bean对象
     ConcurrentHashMap<String, Object> normalBeanHashMap = new ConcurrentHashMap<>();
+    //按bean的类型与元配置信息的映射
+    ConcurrentHashMap<Object, BeanDefintion> beanTypeBeanDefintion = new ConcurrentHashMap<>();
+    //按bean的名称与元配置信息的映射
+    ConcurrentHashMap<Object, BeanDefintion> beanNameBeanDefintion = new ConcurrentHashMap<>();
 
     public AnnotionContextApplication(Class<AppConfig> appConfigClass) {
         //初始化配置文件
@@ -69,22 +73,44 @@ public class AnnotionContextApplication {
         Set<String> beanNameSet = resourceBeanHashMap.keySet();
         for (String beanName : beanNameSet) {
             //获取到实例对象
-            Class<?> classNameByBeanName = (Class<?>) resourceBeanHashMap.get(beanName);
+            Object resultClass = resourceBeanHashMap.get(beanName);
+            Class<?> classNameByBeanName = resultClass.getClass();
             //获取实例对象的所有属性
             Field[] fieldList = classNameByBeanName.getDeclaredFields();
             //遍历属性
             for (Field field : fieldList) {
+                Object object = null;
                 String fieldName = field.getName();
                 Class<?> fieldType = field.getType().getComponentType();
                 if (field.isAnnotationPresent(Autowired.class)) {
                     //如果含有Autowired注解 则说明为依赖
                     //默认按类型装配
                     if (singletonBeanHashMap.containsKey(fieldType)) {
-
+                        object = singletonBeanHashMap.get(fieldType);
+                    } else if (normalBeanHashMap.contains(fieldType)) {
+                        object = normalBeanHashMap.get(fieldType);
+                    } else {
+                        //重新创建
+                        BeanDefintion beanDefintion = beanNameBeanDefintion.get(fieldType);
+                        String beanClassName = beanDefintion.getBeanClassName();
+                        object = Class.forName(beanClassName).getConstructor().newInstance();
                     }
                 } else if (field.isAnnotationPresent(Resource.class)) {
-
+                    //默认按名称装配
+                    if (singletonBeanHashMap.containsKey(fieldName)) {
+                        object = singletonBeanHashMap.get(fieldName);
+                    } else if (normalBeanHashMap.contains(fieldName)) {
+                        object = normalBeanHashMap.get(fieldName);
+                    } else {
+                        //重新创建
+                        BeanDefintion beanDefintion = beanNameBeanDefintion.get(fieldName);
+                        String beanClassName = beanDefintion.getBeanClassName();
+                        object = Class.forName(beanClassName).getConstructor().newInstance();
+                    }
                 }
+                field.setAccessible(true);
+                field.set(resultClass, object);
+                field.setAccessible(false);
             }
         }
     }
@@ -100,10 +126,11 @@ public class AnnotionContextApplication {
                 continue;
             }
             String beanNameClass = beanDefintion.getBeanNameClass();
-            Object classInstance = Class.forName(beanNameClass).newInstance();
+            String beanClassName = beanDefintion.getBeanClassName();
+            Object classInstance = Class.forName(beanClassName).getConstructor().newInstance();
             String beanTypeName = beanDefintion.getBeanTypeName();
             String scope = beanDefintion.getScope();
-            if (scope.equals("singleton")) {
+            if ("singleton".equals(scope)) {
                 //如果是单例 则存入单例池
                 singletonBeanHashMap.put(beanNameClass, classInstance);
                 singletonBeanHashMap.put(beanTypeName, classInstance);
@@ -122,11 +149,14 @@ public class AnnotionContextApplication {
      */
     public void setBeanDefintion() throws ClassNotFoundException {
         for (String beanClassName : DEFAULT_BEANCLASSNAME) {
+            String beanName = beanClassName;
             BeanDefintion beanDefintion = new BeanDefintion();
+            beanDefintion.setBeanClassName(beanClassName);
             Class<?> aClass = Class.forName(beanClassName);
             if (aClass.isAnnotationPresent(Component.class)) {
                 Component component = aClass.getAnnotation(Component.class);
-                beanDefintion.setBeanNameClass(component.value());
+                beanName = component.value();
+                beanDefintion.setBeanNameClass(beanName);
                 if (aClass.isAnnotationPresent(Scope.class)) {
                     Scope scope = aClass.getAnnotation(Scope.class);
                     beanDefintion.setScope(scope.value());
@@ -137,8 +167,11 @@ public class AnnotionContextApplication {
                 }
                 //设置bean的类型
                 String[] split = beanClassName.split("\\.");
-                beanDefintion.setBeanTypeName(setBeanType(split[split.length - 1]));
+                String beanType = setBeanType(split[split.length - 1]);
+                beanDefintion.setBeanTypeName(beanType);
                 beanDefintionList.add(beanDefintion);
+                beanTypeBeanDefintion.put(beanType, beanDefintion);
+                beanNameBeanDefintion.put(beanClassName, beanDefintion);
             }
         }
     }
@@ -161,6 +194,14 @@ public class AnnotionContextApplication {
      * @return
      */
     public Object getBean(String beanName) {
-        return null;
+        Object object = null;
+        if (singletonBeanHashMap.containsKey(beanName)) {
+            object = singletonBeanHashMap.get(beanName);
+        } else if (normalBeanHashMap.containsKey(beanName)) {
+            object = normalBeanHashMap.get(beanName);
+        } else {
+
+        }
+        return object;
     }
 }

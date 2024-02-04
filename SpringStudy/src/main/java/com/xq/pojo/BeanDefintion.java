@@ -31,6 +31,14 @@ public class BeanDefintion {
         return scope;
     }
 
+    public String getBeanClassName() {
+        return beanClassName;
+    }
+
+    public void setBeanClassName(String beanClassName) {
+        this.beanClassName = beanClassName;
+    }
+
     public void setScope(String scope) {
         this.scope = scope;
     }
@@ -39,5 +47,5 @@ public class BeanDefintion {
     private String beanTypeName;
     private boolean isLazy;
     private String scope;
-
+    private String beanClassName;
 }
