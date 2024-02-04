@@ -1,236 +1,148 @@
 package com.xq.context;
 
-import com.xq.annotion.*;
+import com.xq.annotion.Component;
+import com.xq.annotion.Lazy;
+import com.xq.annotion.Scope;
 import com.xq.config.AppConfig;
 import com.xq.pojo.BeanDefintion;
-import org.springframework.util.Assert;
-import org.springframework.util.ObjectUtils;
-import org.springframework.util.StringUtils;
+import com.xq.support.BeanDefintionReader;
 
-import java.io.File;
-import java.lang.reflect.Field;
-import java.net.URL;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 
 public class AnnotionContextApplication {
-
-    private final String SUFFIX = ".class";
-    private String DEFAULT_BEAN_TYPE = "singleton";
-    HashMap<String, BeanDefintion> BeanDefintionHashMap = new HashMap<String, BeanDefintion>();
-    ConcurrentHashMap<String, Object> singletonHashMap = new ConcurrentHashMap<String, Object>();
-    HashSet<String> beanFactoryList = new HashSet<>();
+    //配置文件
+    Class<AppConfig> appConfigClassList;
+    //bean的名称
+    Set<String> DEFAULT_BEANCLASSNAME = new HashSet<>();
+    List<BeanDefintion> beanDefintionList = new ArrayList<BeanDefintion>();
+    //已经加载完成的单例bean对象
+    ConcurrentHashMap<String, Object> singletonBeanHashMap = new ConcurrentHashMap<>();
+    //已经加载完成的原型bean对象
+    ConcurrentHashMap<String, Object> normalBeanHashMap = new ConcurrentHashMap<>();
 
     public AnnotionContextApplication(Class<AppConfig> appConfigClass) {
-
+        //初始化配置文件
+        appConfigClassList = appConfigClass;
         try {
-            ComponentScan annotation = appConfigClass.getDeclaredAnnotation(ComponentScan.class);
-            Assert.notNull(annotation, "注解为空");
-            //获取当前类加载器
-            ClassLoader classLoader = this.getClass().getClassLoader();
-            //获取当前输出路径
-            String outPutPath = classLoader.getResource("").getPath().substring(1);
-            //获取配置的包
-            String[] packageList = annotation.value();
-            //校验配置包
-            Assert.notEmpty(packageList, "the package resource Data is null!");
-            //遍历扫描包
-            for (String packageUrl : packageList) {
-                //单个扫描包
-                scanByPackageUrl(packageUrl, classLoader, outPutPath);
-            }
-            //初始化bean的元配置信息
-            registerBeanDifinion();
-            //通过元信息注册bean
-            createBean();
+            refresh();
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
 
+    public void refresh() throws Exception {
+        //解析配置文件
+        BeanDefintionReader beanDefintionReader = new BeanDefintionReader(appConfigClassList);
+        DEFAULT_BEANCLASSNAME = beanDefintionReader.DEFAULT_BEANCLASSNAME;
+        //设置bean的元配置信息
+        setBeanDefintion();
+        //初始化非懒加载的bean
+        initNotLazyBean();
+        //为已初始化的bean注入依赖
+        dependencyInjection();
+    }
+
+
     /****
-     * 扫描包路径
-     * @param packageUrl
-     * @param classLoader
-     * @param outPutPath
+     * 为已初始化的bean注入依赖
      * @throws Exception
      */
-    public void scanByPackageUrl(String packageUrl, ClassLoader classLoader, String outPutPath) throws Exception {
-        //解析包路径
-        packageUrl = packageUrl.replaceAll("\\.", "/");
-        URL url = classLoader.getResource(packageUrl);
-        //获取包路径里的文件
-        File resourceFile = new File(url.getFile());
-        //判断资源是否为一个文件夹
-        if (resourceFile.isDirectory()) {
-            //获取文件夹中的所有文件
-            File[] resourceFileList = resourceFile.listFiles();
-            //遍历文件
-            for (File resultFile : resourceFileList) {
-                String resultFilePath = resultFile.getPath();
-                if (resultFilePath.endsWith(SUFFIX)) {
-                    //解析文件名称赋值为目标bean的名字
-                    String resultFileName = resultFile.getName().replaceAll(SUFFIX, "");
-                    resultFileName = String.valueOf(resultFileName.charAt(0)).toLowerCase() + resultFileName.substring(1);
-                    //解析文件路径
-                    resultFilePath = resultFilePath.substring(outPutPath.length(), resultFilePath.length() - SUFFIX.length());
-                    resultFilePath = resultFilePath.replaceAll("\\\\", ".");
-                    beanFactoryList.add(resultFilePath);
-                } else {
-                    //如果是文件夹 递归解析文件夹
-                    recursionAnaFile(resultFile, outPutPath);
-                }
-            }
-        }
+    public void dependencyInjection() throws Exception {
 
+        //给单例池容器中的对象注入依赖
+        doDependencyInjection(singletonBeanHashMap);
+        //给非单例池容器中的对象注入依赖
+        doDependencyInjection(normalBeanHashMap);
     }
 
 
-    public void registerBeanDifinion() throws ClassNotFoundException {
-        for (String beanFactory : beanFactoryList) {
-            //获取bean对象
-            Class<?> className = Class.forName(beanFactory);
-            //是否含有Compoent的注解
-            if (className.isAnnotationPresent(Component.class)) {
-                String beanName = className.getDeclaredAnnotation(Component.class).value();
-                if (!StringUtils.isEmpty(beanName)) {
-                    beanName = beanFactory;
-                }
-                //是否含有scope注解 标识为单例 原型等
-                if (className.isAnnotationPresent(Scope.class)) {
-                    DEFAULT_BEAN_TYPE = className.getDeclaredAnnotation(Scope.class).value();
-                }
-                //注册bean 的元配置信息
-                BeanDefintion beanDefintion = new BeanDefintion(className, DEFAULT_BEAN_TYPE);
-                BeanDefintionHashMap.put(beanName, beanDefintion);
-            }
-        }
+    /****
+     * 根据传入的数据源去注入依赖
+     * @param resourceBeanHashMap
+     * @throws Exception
+     */
+    public void doDependencyInjection(ConcurrentHashMap<String, Object> resourceBeanHashMap) throws Exception {
+
     }
+
 
     /*****
-     * 注册bean对象
+     * 初始化非懒加载的bean
      * @throws Exception
      */
-    public void createBean() throws Exception {
-        Set<String> beanNameList = BeanDefintionHashMap.keySet();
-        for (String beanName : beanNameList) {
-            BeanDefintion beanDefintion = BeanDefintionHashMap.get(beanName);
+    public void initNotLazyBean() throws Exception {
+        for (BeanDefintion beanDefintion : beanDefintionList) {
+            if (beanDefintion.isLazy()) {
+                continue;
+            }
+            String beanNameClass = beanDefintion.getBeanNameClass();
+            Object classInstance = Class.forName(beanNameClass).newInstance();
+            String beanTypeName = beanDefintion.getBeanTypeName();
             String scope = beanDefintion.getScope();
-            Class<?> className = beanDefintion.getClassName();
             if (scope.equals("singleton")) {
-                //单例
-                singletonHashMap.put(beanName, className.newInstance());
+                //如果是单例 则存入单例池
+                singletonBeanHashMap.put(beanNameClass, classInstance);
+                singletonBeanHashMap.put(beanTypeName, classInstance);
             } else {
-                //原型
-                createBeanByBeanDefintion(className);
+                //非单例 则存入普通的bean容器中
+                normalBeanHashMap.put(beanNameClass, classInstance);
+                normalBeanHashMap.put(beanTypeName, classInstance);
             }
         }
     }
 
 
     /****
-     * 重新创建bean
-     * @param className
+     * 设置bean的元配置信息
+     * @throws ClassNotFoundException
+     */
+    public void setBeanDefintion() throws ClassNotFoundException {
+        for (String beanClassName : DEFAULT_BEANCLASSNAME) {
+            BeanDefintion beanDefintion = new BeanDefintion();
+            Class<?> aClass = Class.forName(beanClassName);
+            if (aClass.isAnnotationPresent(Component.class)) {
+                Component component = aClass.getAnnotation(Component.class);
+                beanDefintion.setBeanNameClass(component.value());
+                if (aClass.isAnnotationPresent(Scope.class)) {
+                    Scope scope = aClass.getAnnotation(Scope.class);
+                    beanDefintion.setScope(scope.value());
+                }
+                if (aClass.isAnnotationPresent(Lazy.class)) {
+                    Lazy lazy = aClass.getAnnotation(Lazy.class);
+                    beanDefintion.setLazy(lazy.value());
+                }
+                //设置bean的类型
+                String[] split = beanClassName.split("\\.");
+                beanDefintion.setBeanTypeName(setBeanType(split[split.length - 1]));
+                beanDefintionList.add(beanDefintion);
+            }
+        }
+    }
+
+
+    /****
+     * 获取bean的类型
+     * @param resourceFileName
      * @return
-     * @throws Exception
      */
-    public Object createBeanByBeanDefintion(Class<?> className) throws Exception {
-        return className.getConstructor().newInstance();
+    public String setBeanType(String resourceFileName) {
+        //设置BeanType
+        return String.valueOf(resourceFileName.charAt(0)).toLowerCase()
+                + resourceFileName.substring(1);
     }
-
-    /****
-     * 递归解析文件夹
-     * @param resourceFile
-     * @param outPutPath
-     * @throws Exception
-     */
-    public void recursionAnaFile(File resourceFile, String outPutPath) throws Exception {
-        if (resourceFile.isDirectory()) {
-            File[] resourceFileList = resourceFile.listFiles();
-            for (File resultFile : resourceFileList) {
-                String resultFilePath = resultFile.getPath();
-                if (resultFilePath.endsWith(SUFFIX)) {
-                    //解析文件名称赋值为目标bean的名字
-                    String resultFileName = resultFile.getName().replaceAll(SUFFIX, "");
-                    resultFilePath = resultFilePath.substring(outPutPath.length(), resultFilePath.length() - SUFFIX.length());
-                    resultFilePath = resultFilePath.replaceAll("\\\\", ".");
-                    Class<?> className = Class.forName(resultFilePath);
-                    //是否含有Compoent的注解
-                    if (className.isAnnotationPresent(Component.class)) {
-                        String beanName = className.getDeclaredAnnotation(Component.class).value();
-                        if (StringUtils.isEmpty(beanName)) {
-                            beanName = resultFileName;
-                        }
-                        //是否含有scope注解 标识为单例 原型等
-                        if (className.isAnnotationPresent(Component.class)) {
-                            DEFAULT_BEAN_TYPE = className.getDeclaredAnnotation(Scope.class).value();
-                        }
-                        //注册bean 的元配置信息
-                        BeanDefintion beanDefintion = new BeanDefintion(className, DEFAULT_BEAN_TYPE);
-                        BeanDefintionHashMap.put(beanName, beanDefintion);
-                    }
-                } else {
-                    recursionAnaFile(resultFile, outPutPath);
-                }
-            }
-        }
-    }
-
-
-    public void di(Class<?> className) throws Exception {
-        //解析是否含有依赖注入
-        Field[] resourceFieldList = className.getDeclaredFields();
-        for (Field resourceField : resourceFieldList) {
-            if (resourceField.isAnnotationPresent(Autowired.class) || resourceField.isAnnotationPresent(Resource.class)) {
-                //如果含有Autowired、Resource注解说明是依赖
-                //首先按类型注入
-                String beanType = resourceField.getType().toString();
-                beanType = String.valueOf(beanType.charAt(0)).toLowerCase() + beanType.substring(1);
-                //
-                BeanDefintion dIbeanDefintion = BeanDefintionHashMap.get(beanType);
-                Object bean = null;
-                if (ObjectUtils.isEmpty(dIbeanDefintion) && resourceField.isAnnotationPresent(Resource.class)) {
-                    //其次按名称注入
-                    String name = resourceField.getName();
-                    bean = getBean(name);
-                }
-                if (ObjectUtils.isEmpty(bean)) {
-                    String dIScope = dIbeanDefintion.getScope();
-                    if (dIScope.equals("singleton")) {
-                        //如果是单例
-                        bean = singletonHashMap.get(beanType);
-                    } else {
-                        bean = createBeanByBeanDefintion(dIbeanDefintion.getClassName());
-                    }
-                }
-                resourceField.setAccessible(true);
-                className.getDeclaredConstructor(bean.getClass()).newInstance(bean);
-//                    resourceField.set(className.newInstance(), bean);
-            }
-        }
-    }
-
 
     /****
      * 根据bean 的类型去读取bean
      * @param beanName
      * @return
      */
-    public Object getBean(String beanName) throws Exception {
-        Object object = null;
-        if (BeanDefintionHashMap.containsKey(beanName)) {
-            BeanDefintion beanDefintion = BeanDefintionHashMap.get(beanName);
-            String scope = beanDefintion.getScope();
-            Class<?> className = beanDefintion.getClassName();
-            if (scope.equals("singleton")) {
-                //说明是单例
-                object = singletonHashMap.get(beanName);
-            } else {
-                object = createBeanByBeanDefintion(className);
-            }
-        }
-        return object;
+    public Object getBean(String beanName) {
+        return null;
     }
 }

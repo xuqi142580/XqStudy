@@ -2,19 +2,29 @@ package com.xq.pojo;
 
 public class BeanDefintion {
 
-    public BeanDefintion(Class className, String scope) {
-        this.className = className;
-        this.scope = scope;
+
+    public String getBeanNameClass() {
+        return beanNameClass;
     }
 
-
-
-    public Class getClassName() {
-        return className;
+    public void setBeanNameClass(String beanNameClass) {
+        this.beanNameClass = beanNameClass;
     }
 
-    public void setClassName(Class className) {
-        this.className = className;
+    public String getBeanTypeName() {
+        return beanTypeName;
+    }
+
+    public void setBeanTypeName(String beanTypeName) {
+        this.beanTypeName = beanTypeName;
+    }
+
+    public boolean isLazy() {
+        return isLazy;
+    }
+
+    public void setLazy(boolean lazy) {
+        isLazy = lazy;
     }
 
     public String getScope() {
@@ -25,8 +35,9 @@ public class BeanDefintion {
         this.scope = scope;
     }
 
-
-    private Class className;
+    private String beanNameClass;
+    private String beanTypeName;
+    private boolean isLazy;
     private String scope;
 
 }
