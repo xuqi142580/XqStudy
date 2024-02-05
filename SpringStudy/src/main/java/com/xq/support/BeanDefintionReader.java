@@ -1,16 +1,12 @@
 package com.xq.support;
 
-import com.xq.annotion.Component;
 import com.xq.annotion.ComponentScan;
 import com.xq.config.AppConfig;
 
 import java.io.File;
-import java.io.UnsupportedEncodingException;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
 public class BeanDefintionReader {
